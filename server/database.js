@@ -53,6 +53,16 @@ async function initDatabase() {
       signin_end_time DATETIME,
       vote_start_time DATETIME,
       vote_end_time DATETIME,
+      -- 签到地点限制
+      signin_location_enabled INTEGER DEFAULT 0,
+      signin_lat REAL,
+      signin_lng REAL,
+      signin_radius INTEGER DEFAULT 50,
+      -- 投票地点限制
+      vote_location_enabled INTEGER DEFAULT 0,
+      vote_lat REAL,
+      vote_lng REAL,
+      vote_radius INTEGER DEFAULT 50,
       status TEXT DEFAULT 'pending',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
@@ -97,6 +107,16 @@ async function initDatabase() {
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (candidate_id) REFERENCES candidates(id)
     )`);
+    
+    // 为已有数据库补充地点限制字段（ALTER TABLE 对已存在的列会报错，用 try/catch 吞掉）
+    try { db.run(`ALTER TABLE activities ADD COLUMN signin_location_enabled INTEGER DEFAULT 0`); } catch(e) {}
+    try { db.run(`ALTER TABLE activities ADD COLUMN signin_lat REAL`); } catch(e) {}
+    try { db.run(`ALTER TABLE activities ADD COLUMN signin_lng REAL`); } catch(e) {}
+    try { db.run(`ALTER TABLE activities ADD COLUMN signin_radius INTEGER DEFAULT 50`); } catch(e) {}
+    try { db.run(`ALTER TABLE activities ADD COLUMN vote_location_enabled INTEGER DEFAULT 0`); } catch(e) {}
+    try { db.run(`ALTER TABLE activities ADD COLUMN vote_lat REAL`); } catch(e) {}
+    try { db.run(`ALTER TABLE activities ADD COLUMN vote_lng REAL`); } catch(e) {}
+    try { db.run(`ALTER TABLE activities ADD COLUMN vote_radius INTEGER DEFAULT 50`); } catch(e) {}
     
     saveDatabase();
     console.log('✅ 数据库表初始化完成');

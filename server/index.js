@@ -15,6 +15,17 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
+// Haversine 公式：计算两点间地球表面距离（米）
+function haversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // 地球半径（米）
+  const toRad = (deg) => deg * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 // 配置 multer
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -75,13 +86,21 @@ app.post('/api/activities', (req, res) => {
   const {
     name, signin_name, vote_name,
     signin_start_time, signin_end_time,
-    vote_start_time, vote_end_time
+    vote_start_time, vote_end_time,
+    signin_location_enabled, signin_lat, signin_lng, signin_radius,
+    vote_location_enabled, vote_lat, vote_lng, vote_radius
   } = req.body;
 
   const result = run(`
-    INSERT INTO activities (name, signin_name, vote_name, signin_start_time, signin_end_time, vote_start_time, vote_end_time)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `, [name, signin_name, vote_name, signin_start_time, signin_end_time, vote_start_time, vote_end_time]);
+    INSERT INTO activities (name, signin_name, vote_name, signin_start_time, signin_end_time,
+      vote_start_time, vote_end_time,
+      signin_location_enabled, signin_lat, signin_lng, signin_radius,
+      vote_location_enabled, vote_lat, vote_lng, vote_radius)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [name, signin_name, vote_name, signin_start_time, signin_end_time,
+      vote_start_time, vote_end_time,
+      signin_location_enabled ? 1 : 0, signin_lat || null, signin_lng || null, signin_radius || 50,
+      vote_location_enabled ? 1 : 0, vote_lat || null, vote_lng || null, vote_radius || 50]);
   
   res.json({ success: true, activityId: result.lastInsertRowid });
 });
@@ -349,6 +368,16 @@ app.post('/api/signin', (req, res) => {
     return res.status(400).json({ error: '不在签到时间范围内' });
   }
   
+  // 地点限制检查
+  if (activity.signin_location_enabled && req.body.lat != null && req.body.lng != null) {
+    const dist = haversineDistance(req.body.lat, req.body.lng, activity.signin_lat, activity.signin_lng);
+    if (dist > activity.signin_radius) {
+      return res.status(400).json({
+        error: `您不在签到范围内（当前位置距签到点约 ${Math.round(dist)} 米，超出限制 ${activity.signin_radius} 米）`
+      });
+    }
+  }
+  
   // 生成4位随机邀请码
   let inviteCode;
   let attempts = 0;
@@ -454,6 +483,16 @@ app.post('/api/vote', (req, res) => {
   
   if (voteStartTime && voteEndTime && (nowVote < voteStartTime || nowVote > voteEndTime)) {
     return res.status(400).json({ error: '不在投票时间范围内' });
+  }
+  
+  // 地点限制检查
+  if (activity.vote_location_enabled && req.body.lat != null && req.body.lng != null) {
+    const dist = haversineDistance(req.body.lat, req.body.lng, activity.vote_lat, activity.vote_lng);
+    if (dist > activity.vote_radius) {
+      return res.status(400).json({
+        error: `您不在投票范围内（当前位置距投票点约 ${Math.round(dist)} 米，超出限制 ${activity.vote_radius} 米）`
+      });
+    }
   }
   
   // 验证用户

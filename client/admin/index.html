@@ -119,6 +119,57 @@
                   <input v-model="editActivity.vote_end_time" type="datetime-local" class="w-full border rounded-lg px-3 py-2">
                 </div>
               </div>
+              
+              <!-- 签到地点限制 -->
+              <div class="border rounded-lg p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm font-medium text-gray-700">启用签到地点限制</span>
+                  <input type="checkbox" v-model="editActivity.signin_location_enabled" class="w-5 h-5 accent-blue-500">
+                </div>
+                <div v-if="editActivity.signin_location_enabled" class="grid grid-cols-3 gap-3">
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">签到点纬度</label>
+                    <input v-model="editActivity.signin_lat" type="number" step="0.000001" placeholder="例: 31.2304" class="w-full border rounded px-2 py-1 text-sm">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">签到点经度</label>
+                    <input v-model="editActivity.signin_lng" type="number" step="0.000001" placeholder="例: 121.4737" class="w-full border rounded px-2 py-1 text-sm">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">允许半径（米）</label>
+                    <input v-model="editActivity.signin_radius" type="number" placeholder="50" class="w-full border rounded px-2 py-1 text-sm">
+                  </div>
+                </div>
+                <button v-if="editActivity.signin_location_enabled" type="button" @click="getMyLocation('signin')"
+                        class="text-xs text-blue-500 hover:underline">📍 使用当前位置</button>
+                <p v-if="editActivity.signin_location_enabled" class="text-xs text-gray-400">用户必须在场地中心 {{ editActivity.signin_radius || 50 }} 米范围内才能签到</p>
+              </div>
+
+              <!-- 投票地点限制 -->
+              <div class="border rounded-lg p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm font-medium text-gray-700">启用投票地点限制</span>
+                  <input type="checkbox" v-model="editActivity.vote_location_enabled" class="w-5 h-5 accent-blue-500">
+                </div>
+                <div v-if="editActivity.vote_location_enabled" class="grid grid-cols-3 gap-3">
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">投票点纬度</label>
+                    <input v-model="editActivity.vote_lat" type="number" step="0.000001" placeholder="例: 31.2304" class="w-full border rounded px-2 py-1 text-sm">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">投票点经度</label>
+                    <input v-model="editActivity.vote_lng" type="number" step="0.000001" placeholder="例: 121.4737" class="w-full border rounded px-2 py-1 text-sm">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">允许半径（米）</label>
+                    <input v-model="editActivity.vote_radius" type="number" placeholder="50" class="w-full border rounded px-2 py-1 text-sm">
+                  </div>
+                </div>
+                <button v-if="editActivity.vote_location_enabled" type="button" @click="getMyLocation('vote')"
+                        class="text-xs text-blue-500 hover:underline">📍 使用当前位置</button>
+                <p v-if="editActivity.vote_location_enabled" class="text-xs text-gray-400">用户必须在场地中心 {{ editActivity.vote_radius || 50 }} 米范围内才能投票</p>
+              </div>
+              
               <button type="submit" class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600">
                 保存修改
               </button>
@@ -249,6 +300,52 @@
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">投票结束时间</label>
               <input v-model="newActivity.vote_end_time" type="datetime-local" class="w-full border rounded-lg px-3 py-2">
+            </div>
+            
+            <!-- 签到地点限制 -->
+            <div class="border rounded-lg p-4 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-700">启用签到地点限制</span>
+                <input type="checkbox" v-model="newActivity.signin_location_enabled" class="w-5 h-5 accent-blue-500">
+              </div>
+              <div v-if="newActivity.signin_location_enabled" class="grid grid-cols-3 gap-3">
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">签到点纬度</label>
+                  <input v-model="newActivity.signin_lat" type="number" step="0.000001" placeholder="例: 31.2304" class="w-full border rounded px-2 py-1 text-sm">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">签到点经度</label>
+                  <input v-model="newActivity.signin_lng" type="number" step="0.000001" placeholder="例: 121.4737" class="w-full border rounded px-2 py-1 text-sm">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">允许半径（米）</label>
+                  <input v-model="newActivity.signin_radius" type="number" placeholder="50" class="w-full border rounded px-2 py-1 text-sm">
+                </div>
+              </div>
+              <p v-if="newActivity.signin_location_enabled" class="text-xs text-gray-400">用户必须在场地中心 {{ newActivity.signin_radius || 50 }} 米范围内才能签到</p>
+            </div>
+
+            <!-- 投票地点限制 -->
+            <div class="border rounded-lg p-4 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-700">启用投票地点限制</span>
+                <input type="checkbox" v-model="newActivity.vote_location_enabled" class="w-5 h-5 accent-blue-500">
+              </div>
+              <div v-if="newActivity.vote_location_enabled" class="grid grid-cols-3 gap-3">
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">投票点纬度</label>
+                  <input v-model="newActivity.vote_lat" type="number" step="0.000001" placeholder="例: 31.2304" class="w-full border rounded px-2 py-1 text-sm">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">投票点经度</label>
+                  <input v-model="newActivity.vote_lng" type="number" step="0.000001" placeholder="例: 121.4737" class="w-full border rounded px-2 py-1 text-sm">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">允许半径（米）</label>
+                  <input v-model="newActivity.vote_radius" type="number" placeholder="50" class="w-full border rounded px-2 py-1 text-sm">
+                </div>
+              </div>
+              <p v-if="newActivity.vote_location_enabled" class="text-xs text-gray-400">用户必须在场地中心 {{ newActivity.vote_radius || 50 }} 米范围内才能投票</p>
             </div>
           </div>
           <div class="flex justify-end space-x-2 mt-6">
@@ -445,7 +542,15 @@
               signin_start_time: '',
               signin_end_time: '',
               vote_start_time: '',
-              vote_end_time: ''
+              vote_end_time: '',
+              signin_location_enabled: false,
+              signin_lat: null,
+              signin_lng: null,
+              signin_radius: 50,
+              vote_location_enabled: false,
+              vote_lat: null,
+              vote_lng: null,
+              vote_radius: 50
             };
           }
         }
@@ -473,6 +578,29 @@
           });
           currentActivity.value.status = status;
           alert('状态已更新');
+        }
+
+        function getMyLocation(type) {
+          if (!navigator.geolocation) {
+            alert('您的浏览器不支持定位功能');
+            return;
+          }
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              if (type === 'signin') {
+                editActivity.value.signin_lat = pos.coords.latitude;
+                editActivity.value.signin_lng = pos.coords.longitude;
+              } else {
+                editActivity.value.vote_lat = pos.coords.latitude;
+                editActivity.value.vote_lng = pos.coords.longitude;
+              }
+              alert(`已获取当前位置：纬度 ${pos.coords.latitude.toFixed(6)}，经度 ${pos.coords.longitude.toFixed(6)}`);
+            },
+            (err) => {
+              alert('获取位置失败：' + (err.code === 1 ? '定位权限被拒绝' : '请重试'));
+            },
+            { enableHighAccuracy: true, timeout: 15000 }
+          );
         }
 
         function showAddCandidateModal() {
@@ -671,6 +799,7 @@
           uploadAvatar,
           removeAvatar,
           closeCandidateModal,
+          getMyLocation,
           getStatusText
         };
       }

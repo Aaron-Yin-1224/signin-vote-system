@@ -55,8 +55,8 @@
 
     <!-- 步骤2：选择候选人投票 -->
     <div v-if="step === 2" class="max-w-4xl mx-auto pt-8">
-      <div class="bg-white rounded-2xl shadow-xl p-6 mb-6">
-        <div class="flex items-center justify-between">
+      <div class="bg-white rounded-2xl shadow-xl p-6 mb-4">
+        <div class="flex items-center justify-between mb-3">
           <div>
             <h2 class="text-2xl font-bold text-gray-800">{{ activityInfo.vote_name || '投票' }}</h2>
             <p class="text-gray-500 mt-1">请选择您支持的候选人（每位用户只能投一票）</p>
@@ -66,6 +66,41 @@
             <p class="text-xl font-bold text-purple-600">{{ inputCode }}</p>
           </div>
         </div>
+        <!-- 位置检测 -->
+        <button type="button" @click="getLocation"
+                class="w-full border-2 rounded-xl px-4 py-3 flex items-center justify-center transition text-sm"
+                :class="locationStatus === 'success' ? 'border-green-500 bg-green-50 text-green-700' :
+                       locationStatus === 'outside' ? 'border-red-500 bg-red-50 text-red-700' :
+                       locationStatus === 'error' ? 'border-red-500 bg-red-50 text-red-700' :
+                       'border-gray-200 text-gray-600 hover:border-purple-400 hover:text-purple-600'">
+          <span v-if="locationStatus === 'loading'" class="flex items-center">
+            <svg class="animate-spin mr-2 h-4 w-4 text-purple-500" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            获取当前位置中...
+          </span>
+          <span v-else-if="locationStatus === 'success'" class="flex items-center">
+            <span class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+            位置验证成功 ✓（已记录您的位置）
+          </span>
+          <span v-else-if="locationStatus === 'outside'" class="flex items-center">
+            <span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+            ⚠️ 不在投票范围内（距投票点约 {{ locationDistance }} 米，超出 {{ locationRadius }} 米）
+          </span>
+          <span v-else-if="locationStatus === 'error'" class="flex items-center">
+            <span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+            ⚠️ {{ locationErrorMsg }}
+          </span>
+          <span v-else class="flex items-center">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            获取当前位置（投票地点校验用）
+          </span>
+        </button>
+        <p v-if="locationStatus === 'outside'" class="text-xs text-red-500 mt-1">请前往投票场地范围内后重新获取位置</p>
       </div>
 
       <!-- 候选人列表 -->
@@ -96,12 +131,18 @@
 
       <!-- 投票按钮 -->
       <div class="text-center">
-        <button @click="submitVote" 
-                :disabled="!selectedCandidate"
-                class="bg-purple-500 text-white px-12 py-4 rounded-xl font-medium hover:bg-purple-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+        <button @click="submitVote"
+                :disabled="!selectedCandidate || (activityInfo.vote_location_enabled && locationStatus !== 'success')"
+                class="px-12 py-4 rounded-xl font-medium transition text-lg"
+                :class="!selectedCandidate || (activityInfo.vote_location_enabled && locationStatus !== 'success')
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-purple-500 text-white hover:bg-purple-600'">
           确认投票
         </button>
         <p v-if="!selectedCandidate" class="text-white/70 text-sm mt-2">请先选择一位候选人</p>
+        <p v-else-if="activityInfo.vote_location_enabled && locationStatus !== 'success'" class="text-white/70 text-sm mt-2">
+          {{ locationStatus === 'idle' ? '请点击上方按钮获取您的位置' : '' }}
+        </p>
       </div>
     </div>
 
@@ -157,17 +198,60 @@
         const selectedCandidate = ref(null);
         const votedCandidateName = ref('');
         const error = ref('');
+        // 位置相关
+        const locationStatus = ref('idle');
+        const locationCoords = ref(null);
+        const locationDistance = ref(0);
+        const locationRadius = ref(50);
+        const locationErrorMsg = ref('无法获取位置');
+
+        function getLocation() {
+          if (!navigator.geolocation) {
+            locationStatus.value = 'error';
+            locationErrorMsg.value = '您的浏览器不支持定位功能';
+            return;
+          }
+          locationStatus.value = 'loading';
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const lat = pos.coords.latitude;
+              const lng = pos.coords.longitude;
+              locationCoords.value = { lat, lng };
+              if (activityInfo.value.vote_location_enabled &&
+                  activityInfo.value.vote_lat && activityInfo.value.vote_lng) {
+                const dist = haversineDist(lat, lng,
+                  parseFloat(activityInfo.value.vote_lat),
+                  parseFloat(activityInfo.value.vote_lng));
+                locationDistance.value = Math.round(dist);
+                locationRadius.value = activityInfo.value.vote_radius || 50;
+                locationStatus.value = dist <= locationRadius.value ? 'success' : 'outside';
+              } else {
+                locationStatus.value = 'success';
+              }
+            },
+            (err) => {
+              locationStatus.value = 'error';
+              locationErrorMsg.value = err.code === 1 ? '定位权限被拒绝，请允许获取位置' : '定位失败，请重试';
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+          );
+        }
+
+        function haversineDist(lat1, lon1, lat2, lon2) {
+          const R = 6371000;
+          const toRad = (d) => d * Math.PI / 180;
+          const dLat = toRad(lat2 - lat1);
+          const dLon = toRad(lon2 - lon1);
+          const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+          return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
 
         async function fetchActivity() {
           try {
             const res = await fetch(`/api/activities/${activityId}`);
             activityInfo.value = await res.json();
-            
-            // 获取候选人
             const candRes = await fetch(`/api/activities/${activityId}/candidates`);
             candidates.value = await candRes.json();
-            
-            // 如果URL中带有邀请码，自动验证
             if (prefillCode) {
               await verifyCode();
             }
@@ -210,15 +294,20 @@
           if (!selectedCandidate.value) return;
 
           try {
+            const body = {
+              activityId,
+              userId: userId.value,
+              candidateId: selectedCandidate.value,
+              inviteCode: inputCode.value
+            };
+            if (locationCoords.value) {
+              body.lat = locationCoords.value.lat;
+              body.lng = locationCoords.value.lng;
+            }
             const res = await fetch('/api/vote', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                activityId,
-                userId: userId.value,
-                candidateId: selectedCandidate.value,
-                inviteCode: inputCode.value
-              })
+              body: JSON.stringify(body)
             });
 
             const data = await res.json();
@@ -241,6 +330,8 @@
           selectedCandidate.value = null;
           error.value = '';
           codeError.value = '';
+          locationStatus.value = 'idle';
+          locationCoords.value = null;
         }
 
         onMounted(fetchActivity);
@@ -254,9 +345,14 @@
           selectedCandidate,
           votedCandidateName,
           error,
+          locationStatus,
+          locationDistance,
+          locationRadius,
+          locationErrorMsg,
           verifyCode,
           submitVote,
-          reset
+          reset,
+          getLocation
         };
       }
     }).mount('#app');
