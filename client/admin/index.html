@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理后台 - 签到投票系统</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .modal-backdrop { background: rgba(0,0,0,0.5); }
+    .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div id="app">
+    <!-- 顶部导航 -->
+    <nav class="bg-white shadow-sm">
+      <div class="max-w-7xl mx-auto px-4 py-4">
+        <div class="flex items-center justify-between">
+          <h1 class="text-xl font-bold text-gray-800">
+            <i class="ri-settings-3-line mr-2"></i>签到投票系统 - 管理后台
+          </h1>
+          <button @click="showCreateActivityModal" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+            <i class="ri-add-line mr-1"></i>新建活动
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <div class="max-w-7xl mx-auto px-4 py-6">
+      <!-- 活动列表 -->
+      <div v-if="!currentActivity" class="space-y-4">
+        <h2 class="text-lg font-semibold text-gray-700 mb-4">活动列表</h2>
+        <div v-if="activities.length === 0" class="text-center py-12 text-gray-500">
+          <i class="ri-calendar-line text-6xl"></i>
+          <p class="mt-4">暂无活动，请创建新活动</p>
+        </div>
+        <div v-for="activity in activities" :key="activity.id" class="bg-white rounded-lg shadow p-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="font-semibold text-lg">{{ activity.name }}</h3>
+              <p class="text-sm text-gray-500 mt-1">
+                签到: {{ activity.signin_name }} | 投票: {{ activity.vote_name }}
+              </p>
+              <p class="text-sm text-gray-500">
+                状态: 
+                <span :class="{
+                  'text-yellow-600': activity.status === 'pending',
+                  'text-blue-600': activity.status === 'signin',
+                  'text-green-600': activity.status === 'voting',
+                  'text-gray-600': activity.status === 'ended'
+                }">{{ getStatusText(activity.status) }}</span>
+              </p>
+            </div>
+            <div class="flex space-x-2">
+              <button @click="openActivity(activity)" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                管理
+              </button>
+              <button @click="deleteActivity(activity.id)" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
+                删除
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 活动管理详情 -->
+      <div v-if="currentActivity" class="space-y-6">
+        <!-- 返回按钮 -->
+        <button @click="currentActivity = null" class="text-blue-500 hover:text-blue-600">
+          <i class="ri-arrow-left-line"></i> 返回活动列表
+        </button>
+
+        <!-- Tab导航 -->
+        <div class="bg-white rounded-lg shadow">
+          <div class="border-b flex">
+            <button @click="activeTab = 'basic'" :class="{'tab-active': activeTab === 'basic'}" class="px-6 py-3 font-medium">基本信息</button>
+            <button @click="activeTab = 'candidates'" :class="{'tab-active': activeTab === 'candidates'}" class="px-6 py-3 font-medium">候选人管理</button>
+            <button @click="activeTab = 'stats'" :class="{'tab-active': activeTab === 'stats'}" class="px-6 py-3 font-medium">数据统计</button>
+            <button @click="activeTab = 'screen'" :class="{'tab-active': activeTab === 'screen'}" class="px-6 py-3 font-medium">大屏控制</button>
+          </div>
+
+          <!-- 基本信息 -->
+          <div v-if="activeTab === 'basic'" class="p-6">
+            <form @submit.prevent="updateActivity" class="space-y-4 max-w-2xl">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">活动名称</label>
+                <input v-model="editActivity.name" type="text" class="w-full border rounded-lg px-3 py-2" required>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">签到活动名称</label>
+                  <input v-model="editActivity.signin_name" type="text" class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">投票活动名称</label>
+                  <input v-model="editActivity.vote_name" type="text" class="w-full border rounded-lg px-3 py-2">
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">签到开始时间</label>
+                  <input v-model="editActivity.signin_start_time" type="datetime-local" class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">签到结束时间</label>
+                  <input v-model="editActivity.signin_end_time" type="datetime-local" class="w-full border rounded-lg px-3 py-2">
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">投票开始时间</label>
+                  <input v-model="editActivity.vote_start_time" type="datetime-local" class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">投票结束时间</label>
+                  <input v-model="editActivity.vote_end_time" type="datetime-local" class="w-full border rounded-lg px-3 py-2">
+                </div>
+              </div>
+              <button type="submit" class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600">
+                保存修改
+              </button>
+            </form>
+          </div>
+
+          <!-- 候选人管理 -->
+          <div v-if="activeTab === 'candidates'" class="p-6">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="font-semibold">候选人列表 ({{ candidates.length }}/100)</h3>
+              <div class="flex space-x-2">
+                <button @click="downloadTemplate" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">
+                  <i class="ri-download-line mr-1"></i>下载模板
+                </button>
+                <label class="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 cursor-pointer">
+                  <i class="ri-upload-line mr-1"></i>Excel导入
+                  <input type="file" @change="importExcel" accept=".xlsx,.xls" class="hidden">
+                </label>
+                <button @click="showBatchAddModal = true" class="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600">
+                  <i class="ri-file-list-line mr-1"></i>批量添加
+                </button>
+                <button @click="showAddCandidateModal" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">
+                  <i class="ri-add-line mr-1"></i>添加候选人
+                </button>
+              </div>
+            </div>
+            
+            <!-- 导入结果提示 -->
+            <div v-if="importResult" class="mb-4 p-3 rounded-lg" :class="importResult.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
+              {{ importResult.message }}
+              <button @click="importResult = null" class="ml-2 text-sm underline">关闭</button>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div v-for="candidate in candidates" :key="candidate.id" class="border rounded-lg p-4">
+                <div class="flex items-center space-x-3">
+                  <img :src="candidate.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + candidate.id" class="w-16 h-16 rounded-full">
+                  <div class="flex-1">
+                    <h4 class="font-medium">{{ candidate.name }}</h4>
+                    <p class="text-sm text-gray-500">{{ candidate.award || '未设置奖项' }}</p>
+                    <p class="text-sm text-blue-500">票数: {{ candidate.vote_count }}</p>
+                  </div>
+                </div>
+                <div class="mt-3 flex space-x-2">
+                  <button @click="editCandidate(candidate)" class="text-blue-500 text-sm hover:underline">编辑</button>
+                  <button @click="deleteCandidate(candidate.id)" class="text-red-500 text-sm hover:underline">删除</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 数据统计 -->
+          <div v-if="activeTab === 'stats'" class="p-6">
+            <div class="grid grid-cols-3 gap-6 mb-6">
+              <div class="bg-blue-50 rounded-lg p-4 text-center">
+                <p class="text-3xl font-bold text-blue-600">{{ currentActivity.signin_count || 0 }}</p>
+                <p class="text-gray-600 mt-1">签到人数</p>
+              </div>
+              <div class="bg-green-50 rounded-lg p-4 text-center">
+                <p class="text-3xl font-bold text-green-600">{{ currentActivity.vote_count || 0 }}</p>
+                <p class="text-gray-600 mt-1">投票人数</p>
+              </div>
+              <div class="bg-purple-50 rounded-lg p-4 text-center">
+                <p class="text-3xl font-bold text-purple-600">{{ candidates.length }}</p>
+                <p class="text-gray-600 mt-1">候选人数量</p>
+              </div>
+            </div>
+            <div class="text-sm text-gray-500">
+              投票率: {{ currentActivity.signin_count > 0 ? ((currentActivity.vote_count / currentActivity.signin_count) * 100).toFixed(1) : 0 }}%
+            </div>
+          </div>
+
+          <!-- 大屏控制 -->
+          <div v-if="activeTab === 'screen'" class="p-6">
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">活动状态控制</label>
+                <div class="flex space-x-2">
+                  <button @click="changeStatus('signin')" class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">开始签到</button>
+                  <button @click="changeStatus('voting')" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">开始投票</button>
+                  <button @click="changeStatus('ended')" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">结束活动</button>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-gray-600 mb-2">大屏展示地址：</p>
+                <a :href="screenUrl" target="_blank" class="text-blue-500 hover:underline">{{ screenUrl }}</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 创建活动弹窗 -->
+    <div v-if="showModal" class="fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg p-6 w-full max-w-lg">
+        <h3 class="text-lg font-semibold mb-4">创建新活动</h3>
+        <form @submit.prevent="createActivity" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">活动名称</label>
+            <input v-model="newActivity.name" type="text" class="w-full border rounded-lg px-3 py-2" required placeholder="例：2024年度优秀员工评选">
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">签到活动名称</label>
+              <input v-model="newActivity.signin_name" type="text" class="w-full border rounded-lg px-3 py-2" placeholder="签到活动">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">投票活动名称</label>
+              <input v-model="newActivity.vote_name" type="text" class="w-full border rounded-lg px-3 py-2" placeholder="投票活动">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">签到开始时间</label>
+              <input v-model="newActivity.signin_start_time" type="datetime-local" class="w-full border rounded-lg px-3 py-2">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">签到结束时间</label>
+              <input v-model="newActivity.signin_end_time" type="datetime-local" class="w-full border rounded-lg px-3 py-2">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">投票开始时间</label>
+              <input v-model="newActivity.vote_start_time" type="datetime-local" class="w-full border rounded-lg px-3 py-2">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">投票结束时间</label>
+              <input v-model="newActivity.vote_end_time" type="datetime-local" class="w-full border rounded-lg px-3 py-2">
+            </div>
+          </div>
+          <div class="flex justify-end space-x-2 mt-6">
+            <button type="button" @click="showModal = false" class="px-4 py-2 border rounded-lg hover:bg-gray-50">取消</button>
+            <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">创建</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 添加候选人弹窗 -->
+    <div v-if="showCandidateModal" class="fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg p-6 w-full max-w-md">
+        <h3 class="text-lg font-semibold mb-4">{{ editingCandidate ? '编辑候选人' : '添加候选人' }}</h3>
+        <form @submit.prevent="saveCandidate" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">姓名</label>
+            <input v-model="candidateForm.name" type="text" class="w-full border rounded-lg px-3 py-2" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">头像</label>
+            <div class="flex items-center space-x-4">
+              <div class="relative">
+                <img :src="candidateForm.avatarPreview || candidateForm.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" 
+                     class="w-20 h-20 rounded-full border-2 border-gray-200 object-cover">
+                <label v-if="!candidateForm.avatar" class="absolute bottom-0 right-0 bg-blue-500 text-white rounded-full p-1 cursor-pointer hover:bg-blue-600">
+                  <i class="ri-camera-line text-sm"></i>
+                  <input type="file" @change="uploadAvatar" accept="image/*" class="hidden">
+                </label>
+                <button v-if="candidateForm.avatar || candidateForm.avatarPreview" 
+                        @click="removeAvatar" type="button"
+                        class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600">
+                  <i class="ri-close-line text-sm"></i>
+                </button>
+              </div>
+              <div class="text-sm text-gray-500">
+                <p>点击上传头像</p>
+                <p class="text-xs">支持 jpg、png、gif、webp</p>
+              </div>
+            </div>
+            <input v-model="candidateForm.avatar" type="text" class="w-full border rounded-lg px-3 py-2 mt-2" placeholder="或输入头像URL">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">参选奖项</label>
+            <input v-model="candidateForm.award" type="text" class="w-full border rounded-lg px-3 py-2" placeholder="例：最佳创新奖">
+          </div>
+          <div class="flex justify-end space-x-2 mt-6">
+            <button type="button" @click="closeCandidateModal" class="px-4 py-2 border rounded-lg hover:bg-gray-50">取消</button>
+            <button type="submit" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">保存</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 批量添加候选人弹窗 -->
+    <div v-if="showBatchAddModal" class="fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg p-6 w-full max-w-2xl">
+        <h3 class="text-lg font-semibold mb-4">批量添加候选人</h3>
+        <p class="text-sm text-gray-500 mb-3">每行输入一个候选人，格式：姓名,奖项（奖项可选）</p>
+        <textarea v-model="batchText" 
+                  class="w-full border rounded-lg px-3 py-2 h-64 font-mono text-sm"
+                  placeholder="张三,最佳创新奖
+李四,最佳团队奖
+王五
+赵六,优秀员工奖"></textarea>
+        <div class="flex justify-end space-x-2 mt-4">
+          <button type="button" @click="showBatchAddModal = false" class="px-4 py-2 border rounded-lg hover:bg-gray-50">取消</button>
+          <button type="button" @click="batchAddCandidates" class="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600">添加</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script>
+    const { createApp, ref, computed, onMounted } = Vue;
+
+    createApp({
+      setup() {
+        const activities = ref([]);
+        const currentActivity = ref(null);
+        const editActivity = ref({});
+        const candidates = ref([]);
+        const activeTab = ref('basic');
+        const showModal = ref(false);
+        const showCandidateModal = ref(false);
+        const editingCandidate = ref(null);
+        
+        const newActivity = ref({
+          name: '',
+          signin_name: '签到活动',
+          vote_name: '投票活动',
+          signin_start_time: '',
+          signin_end_time: '',
+          vote_start_time: '',
+          vote_end_time: ''
+        });
+
+        const candidateForm = ref({
+          name: '',
+          avatar: '',
+          avatarPreview: '',
+          award: ''
+        });
+        
+        const showBatchAddModal = ref(false);
+        const batchText = ref('');
+        const importResult = ref(null);
+
+        const screenUrl = computed(() => {
+          if (!currentActivity.value) return '';
+          return `${window.location.origin}/screen/index.html?activityId=${currentActivity.value.id}`;
+        });
+
+        const apiBase = '';
+
+        async function fetchActivities() {
+          const res = await fetch(`${apiBase}/api/activities`);
+          activities.value = await res.json();
+        }
+
+        async function openActivity(activity) {
+          const res = await fetch(`${apiBase}/api/activities/${activity.id}`);
+          currentActivity.value = await res.json();
+          editActivity.value = { ...currentActivity.value };
+          
+          // 格式化时间
+          if (editActivity.value.signin_start_time) {
+            editActivity.value.signin_start_time = editActivity.value.signin_start_time.slice(0, 16);
+          }
+          if (editActivity.value.signin_end_time) {
+            editActivity.value.signin_end_time = editActivity.value.signin_end_time.slice(0, 16);
+          }
+          if (editActivity.value.vote_start_time) {
+            editActivity.value.vote_start_time = editActivity.value.vote_start_time.slice(0, 16);
+          }
+          if (editActivity.value.vote_end_time) {
+            editActivity.value.vote_end_time = editActivity.value.vote_end_time.slice(0, 16);
+          }
+          
+          await fetchCandidates();
+        }
+
+        async function fetchCandidates() {
+          if (!currentActivity.value) return;
+          const res = await fetch(`${apiBase}/api/activities/${currentActivity.value.id}/candidates`);
+          candidates.value = await res.json();
+        }
+
+        function showCreateActivityModal() {
+          showModal.value = true;
+        }
+
+        async function createActivity() {
+          const res = await fetch(`${apiBase}/api/activities`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newActivity.value)
+          });
+          const data = await res.json();
+          if (data.success) {
+            showModal.value = false;
+            await fetchActivities();
+            newActivity.value = {
+              name: '',
+              signin_name: '签到活动',
+              vote_name: '投票活动',
+              signin_start_time: '',
+              signin_end_time: '',
+              vote_start_time: '',
+              vote_end_time: ''
+            };
+          }
+        }
+
+        async function updateActivity() {
+          await fetch(`${apiBase}/api/activities/${currentActivity.value.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(editActivity.value)
+          });
+          alert('保存成功');
+        }
+
+        async function deleteActivity(id) {
+          if (!confirm('确定要删除这个活动吗？所有相关数据将被清除。')) return;
+          await fetch(`${apiBase}/api/activities/${id}`, { method: 'DELETE' });
+          await fetchActivities();
+        }
+
+        async function changeStatus(status) {
+          await fetch(`${apiBase}/api/activities/${currentActivity.value.id}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+          });
+          currentActivity.value.status = status;
+          alert('状态已更新');
+        }
+
+        function showAddCandidateModal() {
+          editingCandidate.value = null;
+          candidateForm.value = { name: '', avatar: '', avatarPreview: '', award: '' };
+          showCandidateModal.value = true;
+        }
+
+        function editCandidate(candidate) {
+          editingCandidate.value = candidate;
+          candidateForm.value = { ...candidate, avatarPreview: '' };
+          showCandidateModal.value = true;
+        }
+        
+        // 上传头像
+        async function uploadAvatar(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+          
+          const formData = new FormData();
+          formData.append('avatar', file);
+          
+          try {
+            const res = await fetch(`${apiBase}/api/upload/candidate-avatar`, {
+              method: 'POST',
+              body: formData
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+              candidateForm.value.avatar = data.url;
+              // 预览本地图片
+              candidateForm.value.avatarPreview = URL.createObjectURL(file);
+            } else {
+              alert(data.error || '上传失败');
+            }
+          } catch (err) {
+            alert('上传失败，请重试');
+          }
+          
+          event.target.value = '';
+        }
+        
+        // 删除头像
+        function removeAvatar() {
+          candidateForm.value.avatar = '';
+          candidateForm.value.avatarPreview = '';
+        }
+        
+        // 关闭弹窗时清理
+        function closeCandidateModal() {
+          if (candidateForm.value.avatarPreview && candidateForm.value.avatarPreview.startsWith('blob:')) {
+            URL.revokeObjectURL(candidateForm.value.avatarPreview);
+          }
+          showCandidateModal.value = false;
+        }
+
+        async function saveCandidate() {
+          if (editingCandidate.value) {
+            await fetch(`${apiBase}/api/candidates/${editingCandidate.value.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(candidateForm.value)
+          });
+          } else {
+            await fetch(`${apiBase}/api/activities/${currentActivity.value.id}/candidates`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(candidateForm.value)
+          });
+          }
+          showCandidateModal.value = false;
+          await fetchCandidates();
+        }
+
+        async function deleteCandidate(id) {
+          if (!confirm('确定要删除这个候选人吗？')) return;
+          await fetch(`${apiBase}/api/candidates/${id}`, { method: 'DELETE' });
+          await fetchCandidates();
+        }
+        
+        // 下载Excel模板
+        function downloadTemplate() {
+          window.open(`${apiBase}/api/candidates/template`, '_blank');
+        }
+        
+        // Excel导入
+        async function importExcel(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+          
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            try {
+              const res = await fetch(`${apiBase}/api/activities/${currentActivity.value.id}/candidates/import`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/octet-stream' },
+                body: e.target.result
+              });
+              const data = await res.json();
+              
+              if (data.success) {
+                importResult.value = { success: true, message: data.message };
+                await fetchCandidates();
+              } else {
+                importResult.value = { success: false, message: data.error };
+              }
+            } catch (err) {
+              importResult.value = { success: false, message: '导入失败，请检查文件格式' };
+            }
+            
+            // 清空文件选择
+            event.target.value = '';
+          };
+          reader.readAsArrayBuffer(file);
+        }
+        
+        // 批量添加候选人
+        async function batchAddCandidates() {
+          const lines = batchText.value.trim().split('\n').filter(l => l.trim());
+          if (lines.length === 0) {
+            alert('请输入候选人信息');
+            return;
+          }
+          
+          const candidates = lines.map(line => {
+            const parts = line.split(',').map(p => p.trim());
+            return {
+              name: parts[0] || '',
+              award: parts[1] || ''
+            };
+          }).filter(c => c.name);
+          
+          if (candidates.length === 0) {
+            alert('未检测到有效的候选人信息');
+            return;
+          }
+          
+          const res = await fetch(`${apiBase}/api/activities/${currentActivity.value.id}/candidates/batch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ candidates })
+          });
+          const data = await res.json();
+          
+          if (data.success) {
+            showBatchAddModal.value = false;
+            batchText.value = '';
+            await fetchCandidates();
+            alert(`成功添加 ${data.count} 位候选人`);
+          }
+        }
+
+        function getStatusText(status) {
+          const map = {
+            pending: '未开始',
+            signin: '签到中',
+            voting: '投票中',
+            ended: '已结束'
+          };
+          return map[status] || status;
+        }
+
+        onMounted(fetchActivities);
+
+        return {
+          activities,
+          currentActivity,
+          editActivity,
+          candidates,
+          activeTab,
+          showModal,
+          showCandidateModal,
+          showBatchAddModal,
+          batchText,
+          importResult,
+          editingCandidate,
+          newActivity,
+          candidateForm,
+          screenUrl,
+          fetchActivities,
+          openActivity,
+          fetchCandidates,
+          showCreateActivityModal,
+          createActivity,
+          updateActivity,
+          deleteActivity,
+          changeStatus,
+          showAddCandidateModal,
+          editCandidate,
+          saveCandidate,
+          deleteCandidate,
+          downloadTemplate,
+          importExcel,
+          batchAddCandidates,
+          uploadAvatar,
+          removeAvatar,
+          closeCandidateModal,
+          getStatusText
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>

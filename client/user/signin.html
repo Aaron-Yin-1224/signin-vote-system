@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>签到 - 签到投票系统</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-blue-500 to-purple-600 min-h-screen flex items-center justify-center p-4">
+  <div id="app" class="w-full max-w-md">
+    <!-- 步骤1：微信授权 -->
+    <div v-if="step === 1" class="bg-white rounded-2xl shadow-xl p-8">
+      <div class="text-center mb-6">
+        <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-10 h-10 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178A1.17 1.17 0 0 1 4.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178 1.17 1.17 0 0 1-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 0 1 .598.082l1.584.926a.272.272 0 0 0 .14.047c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 0 1-.023-.156.49.49 0 0 1 .201-.398C23.024 18.48 24 16.82 24 14.98c0-3.21-2.931-5.837-6.656-6.088V8.89c-.135-.01-.269-.03-.406-.03zm-2.53 3.274c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.97-.982zm4.844 0c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.969-.982z"/>
+          </svg>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-800">{{ activityInfo.signin_name || '签到' }}</h2>
+        <p class="text-gray-500 mt-2">{{ activityInfo.name }}</p>
+      </div>
+      
+      <button @click="wechatAuth" class="w-full bg-green-500 text-white py-4 rounded-xl font-medium hover:bg-green-600 transition flex items-center justify-center">
+        <svg class="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348z"/>
+        </svg>
+        微信授权登录
+      </button>
+      
+      <p class="text-center text-gray-400 text-sm mt-4">
+        点击授权即表示同意获取您的微信头像和昵称
+      </p>
+    </div>
+
+    <!-- 步骤2：填写姓名 -->
+    <div v-if="step === 2" class="bg-white rounded-2xl shadow-xl p-8">
+      <div class="text-center mb-6">
+        <img :src="userInfo.avatar" class="w-20 h-20 rounded-full mx-auto mb-4 border-4 border-blue-100">
+        <h2 class="text-xl font-bold text-gray-800">欢迎，{{ userInfo.nickname }}</h2>
+        <p class="text-gray-500 mt-1">请填写您的真实姓名完成签到</p>
+      </div>
+      
+      <form @submit.prevent="submitSignin">
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-700 mb-2">真实姓名</label>
+          <input v-model="realName" type="text" required 
+                 class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:outline-none"
+                 placeholder="请输入您的真实姓名">
+        </div>
+        
+        <button type="submit" class="w-full bg-blue-500 text-white py-4 rounded-xl font-medium hover:bg-blue-600 transition">
+          确认签到
+        </button>
+      </form>
+    </div>
+
+    <!-- 步骤3：签到成功 -->
+    <div v-if="step === 3" class="bg-white rounded-2xl shadow-xl p-8">
+      <div class="text-center">
+        <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+          </svg>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-800 mb-2">签到成功！</h2>
+        <p class="text-gray-500 mb-6">请使用以下邀请码进行投票</p>
+        
+        <div class="bg-blue-50 rounded-xl p-6 mb-6">
+          <p class="text-sm text-gray-600 mb-2">您的投票邀请码</p>
+          <p class="text-4xl font-bold text-blue-600 tracking-widest">{{ inviteCode }}</p>
+        </div>
+        
+        <div class="space-y-3">
+          <a :href="voteUrl" class="block w-full bg-purple-500 text-white py-4 rounded-xl font-medium hover:bg-purple-600 transition text-center">
+            立即去投票
+          </a>
+          <p class="text-sm text-gray-400">或在大屏扫描投票二维码，输入邀请码投票</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 错误状态 -->
+    <div v-if="error" class="bg-white rounded-2xl shadow-xl p-8 text-center">
+      <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </div>
+      <h2 class="text-xl font-bold text-gray-800 mb-2">签到失败</h2>
+      <p class="text-gray-500 mb-4">{{ error }}</p>
+      <button @click="reset" class="text-blue-500 hover:underline">重新签到</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script>
+    const { createApp, ref, onMounted } = Vue;
+
+    createApp({
+      setup() {
+        const activityId = new URLSearchParams(window.location.search).get('activityId');
+        const step = ref(1);
+        const activityInfo = ref({});
+        const userInfo = ref({});
+        const realName = ref('');
+        const inviteCode = ref('');
+        const voteUrl = ref('');
+        const error = ref('');
+
+        async function fetchActivity() {
+          try {
+            const res = await fetch(`/api/activities/${activityId}`);
+            activityInfo.value = await res.json();
+          } catch (e) {
+            error.value = '活动不存在';
+          }
+        }
+
+        async function wechatAuth() {
+          try {
+            // 模拟微信授权
+            const res = await fetch('/api/wechat/auth', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ activityId })
+            });
+            userInfo.value = await res.json();
+            step.value = 2;
+          } catch (e) {
+            error.value = '授权失败，请重试';
+          }
+        }
+
+        async function submitSignin() {
+          try {
+            const res = await fetch('/api/signin', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                activityId,
+                openid: userInfo.value.openid,
+                nickname: userInfo.value.nickname,
+                avatar: userInfo.value.headimgurl,
+                realName: realName.value
+              })
+            });
+            
+            const data = await res.json();
+            
+            if (data.success) {
+              inviteCode.value = data.inviteCode;
+              voteUrl.value = data.voteUrl;
+              step.value = 3;
+            } else {
+              if (data.inviteCode) {
+                // 已签到过，显示之前的邀请码
+                inviteCode.value = data.inviteCode;
+                voteUrl.value = `${window.location.origin}/user/vote.html?activityId=${activityId}&code=${data.inviteCode}`;
+                step.value = 3;
+              } else {
+                error.value = data.error;
+              }
+            }
+          } catch (e) {
+            error.value = '签到失败，请重试';
+          }
+        }
+
+        function reset() {
+          step.value = 1;
+          error.value = '';
+        }
+
+        onMounted(fetchActivity);
+
+        return {
+          step,
+          activityInfo,
+          userInfo,
+          realName,
+          inviteCode,
+          voteUrl,
+          error,
+          wechatAuth,
+          submitSignin,
+          reset
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>

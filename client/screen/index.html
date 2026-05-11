@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>签到投票大屏</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: #fff;
+      overflow: hidden;
+    }
+    .qrcode-container {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 240px;
+    }
+    .qrcode-container img { width: 160px; height: 160px; }
+    .scroll-area {
+      height: 350px;
+      overflow: hidden;
+      position: relative;
+    }
+    .scroll-track {
+      position: absolute;
+      width: 100%;
+      animation: scrollUp 20s linear infinite;
+    }
+    @keyframes scrollUp {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-50%); }
+    }
+    .scroll-row {
+      display: flex;
+      align-items: center;
+      padding: 10px;
+      margin-bottom: 8px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 10px;
+    }
+    .scroll-row img {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      margin-right: 12px;
+      border: 2px solid #4ade80;
+      object-fit: cover;
+    }
+    .scroll-row .info { flex: 1; }
+    .scroll-row .name { font-size: 16px; font-weight: bold; }
+    .scroll-row .desc { font-size: 12px; color: #94a3b8; }
+    @keyframes highlight { 50% { transform: scale(1.02); } }
+    .new-highlight { animation: highlight 0.5s ease-out; border: 1px solid #4ade80; }
+    .stat-box {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 12px 20px;
+    }
+    .chart-box { height: 32vh; min-height: 220px; }
+    .rank-box {
+      background: rgba(255,255,255,0.05);
+      border-radius: 10px;
+      padding: 10px;
+      text-align: center;
+    }
+    .rank-box img {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      margin-bottom: 8px;
+      object-fit: cover;
+    }
+    .rank-1 img { border-color: #fbbf24; }
+    .rank-2 img { border-color: #94a3b8; }
+    .rank-3 img { border-color: #cd7f32; }
+    .rank-box .award { font-size: 11px; color: #94a3b8; }
+    .rank-box .votes { font-size: 14px; color: #4ade80; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div id="app" class="h-screen flex flex-col">
+    <!-- 顶部 -->
+    <header class="bg-gradient-to-r from-blue-600 to-purple-600 py-4 px-8">
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold">{{ activity.name || '加载中...' }}</h1>
+        <div class="flex items-center space-x-4">
+          <div class="stat-box"><span class="text-gray-300 mr-2">签到</span><span class="text-2xl font-bold text-green-400">{{ signinCount }}</span></div>
+          <div class="stat-box"><span class="text-gray-300 mr-2">投票</span><span class="text-2xl font-bold text-blue-400">{{ voteCount }}</span></div>
+          <div class="stat-box"><span :class="{'text-yellow-400':status==='signin','text-green-400':status==='voting'}">{{ statusText }}</span></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- 主内容 -->
+    <main class="flex-1 flex p-4 gap-4">
+      <!-- 左侧 -->
+      <aside class="w-[22%] flex flex-col border-r border-white/10 pr-4">
+        <div class="qrcode-container mb-4">
+          <h3 class="text-gray-700 font-bold mb-2">{{ activity.signin_name || '签到' }}</h3>
+          <img :src="signinQR" alt="QR" v-if="signinQR">
+          <div v-else class="w-40 h-40 bg-gray-200 rounded flex items-center justify-center text-gray-400">加载中...</div>
+        </div>
+        <h3 class="text-green-400 font-bold mb-2">签到墙</h3>
+        <div class="scroll-area">
+          <div class="scroll-track">
+            <div v-for="u in scrollUsers" :key="u.id" class="scroll-row">
+              <img :src="u.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed='+u.id">
+              <div class="info">
+                <div class="name">{{ u.real_name || u.nickname }}</div>
+                <div class="desc">{{ formatTime(u.created_at) }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 中间 -->
+      <section class="flex-1 flex flex-col">
+        <div class="mb-3">
+          <h2 class="text-lg font-bold mb-3">投票排行榜 TOP 5</h2>
+          <div class="flex justify-around">
+            <div v-for="(c,i) in top5" :key="c.id" class="rank-box" :class="'rank-'+(i+1)">
+              <div class="text-base mb-1" :class="{'text-yellow-400':i===0,'text-gray-300':i===1,'text-orange-300':i===2}">No.{{ i+1 }}</div>
+              <img :src="c.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed='+c.id">
+              <div class="font-bold">{{ c.name }}</div>
+              <div class="award">{{ c.award }}</div>
+              <div class="votes">{{ c.vote_count }}票</div>
+            </div>
+          </div>
+        </div>
+        <div class="flex-1">
+          <h2 class="text-lg font-bold mb-3">投票统计</h2>
+          <div class="chart-box bg-white/5 rounded-xl p-4">
+            <div id="chart" class="w-full h-full"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 右侧 -->
+      <aside class="w-[22%] flex flex-col border-l border-white/10 pl-4">
+        <div class="qrcode-container mb-4">
+          <h3 class="text-gray-700 font-bold mb-2">{{ activity.vote_name || '投票' }}</h3>
+          <img :src="voteQR" alt="QR" v-if="voteQR">
+          <div v-else class="w-40 h-40 bg-gray-200 rounded flex items-center justify-center text-gray-400">加载中...</div>
+        </div>
+        <h3 class="text-purple-400 font-bold mb-2">候选人名单</h3>
+        <div class="scroll-area">
+          <div class="scroll-track">
+            <div v-for="c in scrollCandidates" :key="c.id" class="scroll-row">
+              <img :src="c.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed='+c.id">
+              <div class="info">
+                <div class="name">{{ c.name }}</div>
+                <div class="desc">{{ c.award }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script>
+    const { createApp, ref, computed, onMounted } = Vue;
+    const io = window.io;
+
+    createApp({
+      setup() {
+        const activityId = new URLSearchParams(location.search).get('activityId') || '1';
+        const activity = ref({});
+        const signinQR = ref('');
+        const voteQR = ref('');
+        const users = ref([]);
+        const candidates = ref([]);
+        const signinCount = ref(0);
+        const voteCount = ref(0);
+        const status = ref('pending');
+        let chart = null;
+        const newIds = new Set();
+
+        const statusText = computed(() => ({ pending: '未开始', signin: '签到进行中', voting: '投票进行', ended: '已结束' }[status.value] || status.value));
+        const top5 = computed(() => [...candidates.value].sort((a,b) => b.vote_count - a.vote_count).slice(0,5));
+        
+        const scrollUsers = computed(() => {
+          const list = users.value.slice(0,10);
+          return list.length < 5 ? [...list,...list] : list;
+        });
+        
+        const scrollCandidates = computed(() => {
+          const list = [...candidates.value];
+          return list.length < 5 ? [...list,...list] : list;
+        });
+
+        function formatTime(t) {
+          if(!t) return '';
+          const d = new Date(t);
+          return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+        }
+
+        async function load() {
+          try {
+            const [a1, a2, a3, a4] = await Promise.all([
+              fetch('/api/activities/' + activityId).then(r => r.json()),
+              fetch('/api/activities/' + activityId + '/signin-qrcode').then(r => r.json()),
+              fetch('/api/activities/' + activityId + '/vote-qrcode').then(r => r.json()),
+              fetch('/api/activities/' + activityId + '/users').then(r => r.json())
+            ]);
+            activity.value = a1;
+            signinQR.value = a2.qrcode;
+            voteQR.value = a3.qrcode;
+            users.value = a4;
+            signinCount.value = a4.length;
+            status.value = a1.status;
+            await loadCandidates();
+          } catch(e) { console.error('load error:', e); }
+        }
+
+        async function loadCandidates() {
+          try {
+            candidates.value = await fetch('/api/activities/' + activityId + '/candidates').then(r => r.json());
+            voteCount.value = candidates.value.reduce((s,c) => s + c.vote_count, 0);
+            initChart();
+          } catch(e) { console.error('candidates error:', e); }
+        }
+
+        function initChart() {
+          if (!window.echarts) return;
+          chart = echarts.init(document.getElementById('chart'));
+          updateChart();
+          window.addEventListener('resize', () => chart && chart.resize());
+        }
+
+        function updateChart() {
+          if (!chart) return;
+          const arr = [...candidates.value].sort((a,b) => b.vote_count - a.vote_count);
+          if (!arr.length) return;
+          chart.setOption({
+            backgroundColor: 'transparent',
+            tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+            grid: { left: '3%', right: '4%', bottom: '3%', top: '10%', containLabel: true },
+            xAxis: { type: 'value', axisLine: { lineStyle: { color: '#666' } }, axisLabel: { color: '#ccc' }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } } },
+            yAxis: { type: 'category', data: arr.map(c => c.name).reverse(), axisLine: { lineStyle: { color: '#666' } }, axisLabel: { color: '#fff' } },
+            series: [{ type: 'bar', data: arr.map(c => c.vote_count).reverse(), itemStyle: { color: new echarts.graphic.LinearGradient(0,0,1,0,[{offset:0,color:'#3b82f6'},{offset:1,color:'#8b5cf6'}]), borderRadius: [0,6,6,0] }, label: { show: true, position: 'right', color: '#fff' }, barWidth: '55%' }]
+          });
+        }
+
+        function initSocket() {
+          const socket = io();
+          socket.on('user-signed-in', d => {
+            if (d.activityId == activityId) {
+              newIds.add(d.user.id);
+              users.value.unshift(d.user);
+              signinCount.value = users.value.length;
+              setTimeout(() => newIds.delete(d.user.id), 3000);
+            }
+          });
+          socket.on('vote-updated', d => {
+            if (d.activityId == activityId) {
+              candidates.value = d.candidates;
+              voteCount.value = d.candidates.reduce((s,c) => s + c.vote_count, 0);
+              updateChart();
+            }
+          });
+          socket.on('activity-status-changed', d => { if (d.activityId == activityId) status.value = d.status; });
+        }
+
+        onMounted(() => {
+          load();
+          initSocket();
+          setInterval(loadCandidates, 15000);
+        });
+
+        return { activity, signinQR, voteQR, users, candidates, signinCount, voteCount, status, statusText, top5, scrollUsers, scrollCandidates, formatTime };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
