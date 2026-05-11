@@ -322,6 +322,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script>
     const { createApp, ref, computed, onMounted } = Vue;
@@ -336,6 +337,31 @@
         const showModal = ref(false);
         const showCandidateModal = ref(false);
         const editingCandidate = ref(null);
+        
+        // WebSocket 实时更新
+        const io = window.io;
+        if (io) {
+          const socket = io();
+          socket.on('user-signed-in', d => {
+            if (currentActivity.value && String(d.activityId) === String(currentActivity.value.id)) {
+              // 重新拉取活动信息以更新签到数
+              fetch(`${apiBase}/api/activities/${currentActivity.value.id}`)
+                .then(r => r.json())
+                .then(a => { currentActivity.value = { ...currentActivity.value, ...a }; });
+              fetchCandidates();
+            }
+          });
+          socket.on('vote-updated', d => {
+            if (currentActivity.value && String(d.activityId) === String(currentActivity.value.id)) {
+              fetchCandidates();
+            }
+          });
+          socket.on('activity-status-changed', d => {
+            if (currentActivity.value && String(d.activityId) === String(currentActivity.value.id)) {
+              currentActivity.value.status = d.status;
+            }
+          });
+        }
         
         const newActivity = ref({
           name: '',

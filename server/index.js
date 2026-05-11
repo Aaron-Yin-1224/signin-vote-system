@@ -337,10 +337,9 @@ app.post('/api/signin', (req, res) => {
   // 由于 Node.js 会把无时区字符串当 UTC 解析，我们先把字符串转为 UTC 基准再处理
   const toShanghaiTime = (dtStr) => {
     if (!dtStr) return null;
-    // 把 datetime-local 当作 Asia/Shanghai 时间，先转 UTC 再加偏移
-    const localMs = Date.parse(dtStr); // 被 Node.js 解析为 UTC ms
-    // 补偿：把 UTC 基准转回 Asia/Shanghai（减 8h）得到真实本地时间对应的 UTC
-    return new Date(localMs - shanghaiOffset + shanghaiOffset);
+    // datetime-local 视为 Asia/Shanghai 本地时间。Date.parse 把无时区字符串当 UTC 解析，
+    // 所以减 8h 才能得到真实的本地时间（再转回 UTC 比较时自动抵消）
+    return new Date(Date.parse(dtStr) - shanghaiOffset);
   };
   const signinStartTime = toShanghaiTime(activity.signin_start_time);
   const signinEndTime = toShanghaiTime(activity.signin_end_time);
@@ -446,8 +445,9 @@ app.post('/api/vote', (req, res) => {
   const nowVote = new Date(nowUtcV.getTime() + shanghaiOffsetV);
   const toShanghaiTime2 = (dtStr) => {
     if (!dtStr) return null;
-    const localMs = Date.parse(dtStr);
-    return new Date(localMs - shanghaiOffsetV + shanghaiOffsetV);
+    // datetime-local 视为 Asia/Shanghai 本地时间。Date.parse 把无时区字符串当 UTC 解析，
+    // 所以减 8h 才能得到真实的本地时间（再转回 UTC 比较时自动抵消）
+    return new Date(Date.parse(dtStr) - shanghaiOffsetV);
   };
   const voteStartTime = toShanghaiTime2(activity.vote_start_time);
   const voteEndTime = toShanghaiTime2(activity.vote_end_time);

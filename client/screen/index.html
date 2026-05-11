@@ -116,7 +116,7 @@
         <div class="scroll-area">
           <div class="scroll-track">
             <div v-for="u in scrollUsers" :key="u.id" class="scroll-row">
-              <img :src="u.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed='+u.id">
+              <img :src="u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.real_name || u.nickname || 'U')}&background=10b981&color=fff&size=128&bold=true`">
               <div class="info">
                 <div class="name">{{ u.real_name || u.nickname }}</div>
                 <div class="desc">{{ formatTime(u.created_at) }}</div>
@@ -133,7 +133,7 @@
           <div class="flex justify-around">
             <div v-for="(c,i) in top5" :key="c.id" class="rank-box" :class="'rank-'+(i+1)">
               <div class="text-base mb-1" :class="{'text-yellow-400':i===0,'text-gray-300':i===1,'text-orange-300':i===2}">No.{{ i+1 }}</div>
-              <img :src="c.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed='+c.id">
+              <img :src="c.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}&background=6366f1&color=fff&size=128&bold=true`">
               <div class="font-bold">{{ c.name }}</div>
               <div class="award">{{ c.award }}</div>
               <div class="votes">{{ c.vote_count }}票</div>
@@ -159,7 +159,7 @@
         <div class="scroll-area">
           <div class="scroll-track">
             <div v-for="c in scrollCandidates" :key="c.id" class="scroll-row">
-              <img :src="c.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed='+c.id">
+              <img :src="c.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}&background=8b5cf6&color=fff&size=128&bold=true`">
               <div class="info">
                 <div class="name">{{ c.name }}</div>
                 <div class="desc">{{ c.award }}</div>
