@@ -155,7 +155,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div v-for="candidate in candidates" :key="candidate.id" class="border rounded-lg p-4">
                 <div class="flex items-center space-x-3">
-                  <img :src="candidate.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + candidate.id" class="w-16 h-16 rounded-full">
+                  <img :src="candidate.avatar || 'https://ui-avatars.com/api/?name=${encodeURIComponent(candidate.name)}&background=3b82f6&color=fff&size=128&bold=true" class="w-16 h-16 rounded-full">
                   <div class="flex-1">
                     <h4 class="font-medium">{{ candidate.name }}</h4>
                     <p class="text-sm text-gray-500">{{ candidate.award || '未设置奖项' }}</p>
@@ -272,7 +272,7 @@
             <label class="block text-sm font-medium text-gray-700 mb-1">头像</label>
             <div class="flex items-center space-x-4">
               <div class="relative">
-                <img :src="candidateForm.avatarPreview || candidateForm.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" 
+                <img :src="candidateForm.avatarPreview || candidateForm.avatar || 'https://ui-avatars.com/api/?name=${encodeURIComponent(candidateForm.name || '候')}&background=3b82f6&color=fff&size=128&bold=true'" 
                      class="w-20 h-20 rounded-full border-2 border-gray-200 object-cover">
                 <label v-if="!candidateForm.avatar" class="absolute bottom-0 right-0 bg-blue-500 text-white rounded-full p-1 cursor-pointer hover:bg-blue-600">
                   <i class="ri-camera-line text-sm"></i>

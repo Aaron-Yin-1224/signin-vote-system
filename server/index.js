@@ -315,7 +315,7 @@ app.post('/api/wechat/auth', (req, res) => {
 app.post('/api/signin', (req, res) => {
   const { activityId, openid, nickname, avatar, realName } = req.body;
   
-  // 检查是否已签到
+  // 检查是否已签到（同一活动同一微信用户仅限1次）
   const existingUser = get('SELECT * FROM users WHERE openid = ? AND activity_id = ?', [openid, activityId]);
   if (existingUser) {
     return res.status(400).json({ error: '您已签到，请勿重复签到', inviteCode: existingUser.invite_code });

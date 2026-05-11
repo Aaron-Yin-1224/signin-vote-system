@@ -71,7 +71,7 @@ async function initDatabase() {
     db.run(`CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       activity_id INTEGER NOT NULL,
-      openid TEXT UNIQUE,
+      openid TEXT,
       nickname TEXT,
       avatar TEXT,
       real_name TEXT,
@@ -82,6 +82,10 @@ async function initDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (activity_id) REFERENCES activities(id)
     )`);
+
+    // 防止同一 openid 在同一活动中重复签到（表级约束）
+    db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_activity_openid
+            ON users(activity_id, openid)`);
 
     db.run(`CREATE TABLE IF NOT EXISTS votes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

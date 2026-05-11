@@ -75,7 +75,7 @@
              class="candidate-card bg-white rounded-xl shadow-lg p-6 cursor-pointer border-2 border-transparent"
              :class="{ 'selected': selectedCandidate === candidate.id }">
           <div class="flex items-center space-x-4">
-            <img :src="candidate.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + candidate.id" 
+            <img :src="candidate.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(candidate.name)}&background=8b5cf6&color=fff&size=128&bold=true`" 
                  class="w-16 h-16 rounded-full">
             <div class="flex-1">
               <h3 class="font-bold text-lg text-gray-800">{{ candidate.name }}</h3>
