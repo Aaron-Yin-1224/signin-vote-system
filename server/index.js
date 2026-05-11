@@ -291,14 +291,21 @@ app.get('/api/activities/:id/signin-qrcode', async (req, res) => {
   }
 });
 
-// 微信授权模拟
+// 微信授权（真实场景需要微信公众号/小程序的 appid 和授权回调）
+// 当前为模拟实现：生成随机用户信息 + 随机头像（网络随机头像 API）
 app.post('/api/wechat/auth', (req, res) => {
   const { code, activityId } = req.body;
   
+  const uid = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  // 使用 ui-avatars.com 生成带名字的首字母头像，更真实
+  const nicknames = ['参会用户', '活动嘉宾', '现场人员', '签到来宾'];
+  const nickname = nicknames[Math.floor(Math.random() * nicknames.length)] + Math.floor(Math.random() * 100);
+  const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(nickname)}&background=0D8ABC&color=fff&size=128&bold=true`;
+  
   const mockUserInfo = {
-    openid: 'mock_openid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-    nickname: '微信用户' + Math.floor(Math.random() * 10000),
-    headimgurl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + Math.random()
+    openid: 'wx_' + uid,
+    nickname: nickname,
+    headimgurl: avatar
   };
   
   res.json(mockUserInfo);
@@ -321,16 +328,22 @@ app.post('/api/signin', (req, res) => {
   }
   
   // 时间比较统一用 Asia/Shanghai 时区 (UTC+8)
-  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
-  const toLocalTime = (dtStr) => {
+  // 获取 Railway 服务器的 Asia/Shanghai 当前时间
+  const nowUtc = new Date();
+  const shanghaiOffset = 8 * 60 * 60 * 1000;
+  const now = new Date(nowUtc.getTime() + shanghaiOffset);
+  
+  // datetime-local 格式不带时区，视为 Asia/Shanghai 本地时间，直接使用即可（Node.js 默认解析为本地时区，而 Railway 容器在 UTC）
+  // 由于 Node.js 会把无时区字符串当 UTC 解析，我们先把字符串转为 UTC 基准再处理
+  const toShanghaiTime = (dtStr) => {
     if (!dtStr) return null;
-    const d = new Date(dtStr);
-    // datetime-local 格式不带时区，视为本地时间(Asia/Shanghai)
-    // 补偿时区差：new Date() 会把无时区字符串当 UTC 解析
-    return new Date(d.getTime() + 8 * 60 * 60 * 1000);
+    // 把 datetime-local 当作 Asia/Shanghai 时间，先转 UTC 再加偏移
+    const localMs = Date.parse(dtStr); // 被 Node.js 解析为 UTC ms
+    // 补偿：把 UTC 基准转回 Asia/Shanghai（减 8h）得到真实本地时间对应的 UTC
+    return new Date(localMs - shanghaiOffset + shanghaiOffset);
   };
-  const signinStartTime = toLocalTime(activity.signin_start_time);
-  const signinEndTime = toLocalTime(activity.signin_end_time);
+  const signinStartTime = toShanghaiTime(activity.signin_start_time);
+  const signinEndTime = toShanghaiTime(activity.signin_end_time);
   
   if (signinStartTime && signinEndTime && (now < signinStartTime || now > signinEndTime)) {
     console.log(`[签到时间检查] now=${now.toISOString()}, start=${signinStartTime.toISOString()}, end=${signinEndTime.toISOString()}`);
@@ -428,14 +441,16 @@ app.post('/api/vote', (req, res) => {
   }
   
   // 检查投票时间（同样处理时区）
-  const nowVote = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
-  const toLocalTime2 = (dtStr) => {
+  const nowUtcV = new Date();
+  const shanghaiOffsetV = 8 * 60 * 60 * 1000;
+  const nowVote = new Date(nowUtcV.getTime() + shanghaiOffsetV);
+  const toShanghaiTime2 = (dtStr) => {
     if (!dtStr) return null;
-    const d = new Date(dtStr);
-    return new Date(d.getTime() + 8 * 60 * 60 * 1000);
+    const localMs = Date.parse(dtStr);
+    return new Date(localMs - shanghaiOffsetV + shanghaiOffsetV);
   };
-  const voteStartTime = toLocalTime2(activity.vote_start_time);
-  const voteEndTime = toLocalTime2(activity.vote_end_time);
+  const voteStartTime = toShanghaiTime2(activity.vote_start_time);
+  const voteEndTime = toShanghaiTime2(activity.vote_end_time);
   
   if (voteStartTime && voteEndTime && (nowVote < voteStartTime || nowVote > voteEndTime)) {
     return res.status(400).json({ error: '不在投票时间范围内' });
